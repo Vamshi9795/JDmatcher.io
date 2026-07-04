@@ -1,0 +1,676 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Redline — Resume ↔ JD Match</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  :root{
+    --bg: #14171c;
+    --surface: #1b1f26;
+    --surface-2: #21262e;
+    --line: #333a44;
+    --ink: #eeeae1;
+    --ink-dim: #9aa1ab;
+    --match: #8fd14f;
+    --match-dim: #3a4a2c;
+    --gap: #e05f5f;
+    --gap-dim: #4a2c2c;
+    --score: #5fa8d3;
+    --radius: 10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', sans-serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection{ background: var(--match); color: #14171c; }
+  a{ color: var(--score); }
+
+  .wrap{ max-width: 1180px; margin: 0 auto; padding: 0 28px 100px; }
+
+  header.hero{ padding: 72px 0 48px; border-bottom: 1px solid var(--line); margin-bottom: 48px; }
+  .eyebrow{
+    font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--match); display:flex; align-items:center; gap:10px; margin-bottom: 20px;
+  }
+  .eyebrow::before{ content:""; width: 7px; height:7px; background: var(--match); border-radius: 50%; display:inline-block; box-shadow: 0 0 0 3px var(--match-dim); }
+  h1.title{
+    font-family: 'Fraunces', serif; font-weight: 500; font-optical-sizing: auto;
+    font-size: clamp(34px, 5vw, 58px); line-height: 1.05; margin: 0 0 18px; max-width: 18ch;
+  }
+  h1.title em{ font-style: italic; color: var(--match); }
+  .sub{ color: var(--ink-dim); font-size: 17px; max-width: 60ch; margin: 0; }
+  .sub code{ font-family:'IBM Plex Mono', monospace; background: var(--surface-2); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; color: var(--ink); }
+
+  .settings{
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 18px 22px; margin-bottom: 28px; display:flex; flex-wrap:wrap; gap: 18px 26px; align-items:flex-end;
+  }
+  .field{ display:flex; flex-direction:column; gap:6px; }
+  .field label{ font-family:'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-dim); }
+  select, input[type="password"], input[type="text"]{
+    background: var(--surface-2); border: 1px solid var(--line); color: var(--ink);
+    font-family: 'IBM Plex Mono', monospace; font-size: 13.5px; padding: 9px 11px; border-radius: 6px; min-width: 220px;
+  }
+  select:focus, input:focus, textarea:focus, button:focus-visible{ outline: 2px solid var(--score); outline-offset: 1px; }
+  .field.grow{ flex: 1; min-width: 240px; }
+  .field.grow input{ width: 100%; min-width: 0; }
+  .checkbox-row{ display:flex; align-items:center; gap:8px; font-size: 12.5px; color: var(--ink-dim); font-family: 'IBM Plex Mono', monospace; }
+  .checkbox-row input{ accent-color: var(--match); }
+  .key-note{ font-size: 12px; color: var(--ink-dim); max-width: 46ch; }
+
+  .workspace{ display:grid; grid-template-columns: 1.15fr 1fr; gap: 20px; margin-bottom: 28px; align-items:start; }
+  @media (max-width: 900px){ .workspace{ grid-template-columns: 1fr; } }
+  .panel{ background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; display:flex; flex-direction:column; }
+  .panel-head{ padding: 14px 18px; border-bottom: 1px solid var(--line); display:flex; align-items:center; justify-content: space-between; }
+  .panel-head .tag{ font-family:'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-dim); }
+  .panel-head .count{ font-family:'IBM Plex Mono', monospace; font-size: 11px; color: var(--ink-dim); }
+
+  /* resume upload panel */
+  .resume-body{ padding: 16px; display:flex; flex-direction:column; gap:12px; }
+  .dropzone{
+    border: 1.5px dashed var(--line); border-radius: 8px; padding: 22px 16px; text-align:center;
+    cursor: pointer; transition: border-color 0.15s ease, background 0.15s ease;
+    font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; color: var(--ink-dim);
+  }
+  .dropzone:hover, .dropzone.drag{ border-color: var(--match); background: rgba(143,209,79,0.05); color: var(--ink); }
+  .dropzone strong{ color: var(--ink); }
+  .dropzone.disabled{ opacity: 0.4; cursor: not-allowed; }
+
+  .resume-slot{
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px;
+    display:flex; flex-direction:column; gap:8px;
+  }
+  .resume-slot-top{ display:flex; align-items:center; gap:10px; }
+  .resume-slot-top input[type="text"]{ flex:1; min-width: 0; background: var(--surface); }
+  .resume-slot-top .rm{
+    background:none; border:none; color: var(--gap); cursor:pointer; font-family:'IBM Plex Mono', monospace;
+    font-size: 15px; padding: 4px 8px; border-radius: 4px; line-height:1;
+  }
+  .resume-slot-top .rm:hover{ background: var(--gap-dim); }
+  .resume-slot-meta{ font-family:'IBM Plex Mono', monospace; font-size: 11.5px; color: var(--ink-dim); display:flex; align-items:center; gap:8px; }
+  .resume-slot-meta .ok{ color: var(--match); }
+  .resume-slot-meta .warn{ color: var(--gap); }
+  .spinner{
+    width:10px; height:10px; border-radius:50%; border: 2px solid var(--surface); border-top-color: var(--score);
+    animation: spin 0.7s linear infinite; display:inline-block;
+  }
+  @keyframes spin{ to{ transform: rotate(360deg); } }
+
+  textarea{
+    background: transparent; border: none; color: var(--ink); font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px; line-height: 1.65; padding: 18px; resize: vertical; min-height: 400px; width: 100%;
+  }
+  textarea:focus{ outline: none; }
+
+  .action-row{ display:flex; align-items:center; gap: 16px; margin-bottom: 40px; }
+  button.run{
+    background: var(--match); color: #14171c; border: none; font-family: 'IBM Plex Mono', monospace;
+    font-weight: 600; font-size: 14px; letter-spacing: 0.02em; padding: 14px 26px; border-radius: 7px;
+    cursor: pointer; transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+  button.run:hover{ transform: translateY(-1px); box-shadow: 0 6px 18px rgba(143,209,79,0.25); }
+  button.run:disabled{ opacity: 0.5; cursor: not-allowed; transform:none; box-shadow:none; }
+  .status{ font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; color: var(--ink-dim); }
+  .status.err{ color: var(--gap); }
+
+  .results{ display:none; }
+  .results.show{ display:block; }
+  .results-head{
+    font-family:'IBM Plex Mono', monospace; font-size: 12px; letter-spacing:0.08em; text-transform:uppercase;
+    color: var(--ink-dim); margin-bottom: 16px;
+  }
+
+  .result-card{
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    margin-bottom: 22px; overflow:hidden;
+  }
+  .result-card-head{
+    display:flex; align-items:center; gap:16px; padding: 20px 24px; border-bottom: 1px solid var(--line);
+  }
+  .rank-badge{
+    font-family:'Fraunces', serif; font-size: 22px; color: var(--ink-dim); min-width: 34px;
+  }
+  .result-card-head.rank-1 .rank-badge{ color: var(--match); }
+  .result-name{ font-family:'IBM Plex Mono', monospace; font-size: 15px; font-weight:600; color: var(--ink); flex:1; }
+  .mini-dial-wrap{ position:relative; width:56px; height:56px; flex-shrink:0; }
+  .mini-dial-wrap svg{ width:100%; height:100%; transform: rotate(-90deg); }
+  .mini-dial-num{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:'IBM Plex Mono', monospace; font-size: 13px; font-weight:600; }
+
+  .result-card-body{ padding: 20px 24px; }
+  .summary-text{ font-size: 14.5px; color: var(--ink); margin-bottom: 18px; }
+
+  .chip-cols{ display:grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 18px; }
+  @media (max-width: 700px){ .chip-cols{ grid-template-columns: 1fr; } }
+  .chip-col h4{
+    font-family:'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+    margin: 0 0 10px; display:flex; align-items:center; gap:8px;
+  }
+  .chip-col.match h4{ color: var(--match); }
+  .chip-col.gap h4{ color: var(--gap); }
+  .chips{ display:flex; flex-wrap:wrap; gap:7px; }
+  .chip{ font-family:'IBM Plex Mono', monospace; font-size: 12px; padding: 5px 10px; border-radius: 20px; }
+  .chip.match{ background: var(--match-dim); color: var(--match); }
+  .chip.gap{ background: var(--gap-dim); color: var(--gap); }
+
+  .suggestions h4{
+    font-family:'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-dim); margin: 0 0 10px;
+  }
+  .suggestions ol{ margin: 0 0 4px; padding-left: 20px; }
+  .suggestions li{ margin-bottom: 8px; font-size: 14px; }
+  .suggestions li::marker{ font-family:'IBM Plex Mono', monospace; color: var(--score); }
+
+  details.markup{ margin-top: 16px; }
+  details.markup summary{
+    cursor:pointer; font-family:'IBM Plex Mono', monospace; font-size: 12px; color: var(--score);
+    letter-spacing: 0.04em; text-transform: uppercase; list-style: none;
+  }
+  details.markup summary::-webkit-details-marker{ display:none; }
+  details.markup summary::before{ content: "▸ "; }
+  details.markup[open] summary::before{ content: "▾ "; }
+  .rendered{
+    padding: 14px; margin-top: 10px; background: var(--surface-2); border-radius: 6px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; line-height: 1.7; white-space: pre-wrap;
+    max-height: 420px; overflow-y: auto;
+  }
+  mark.hit{ background: var(--match-dim); color: var(--match); border-radius: 3px; padding: 0 2px; box-decoration-break: clone; }
+
+  footer{
+    margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--ink-dim);
+    font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="eyebrow">bring your own key · runs entirely in your browser</div>
+    <h1 class="title">Upload up to three resumes. See which one actually <em>fits</em> the job.</h1>
+    <p class="sub">Drop in up to 3 PDF resumes and name them whatever you like — different versions, different people, whatever you're comparing. Paste one job description. Redline scores each resume against it, side by side, and marks up the strongest one in place.</p>
+  </header>
+
+  <section class="settings">
+    <div class="field">
+      <label for="provider">Provider</label>
+      <select id="provider">
+        <option value="anthropic">Anthropic (Claude)</option>
+        <option value="openai">OpenAI</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="model">Model</label>
+      <input type="text" id="model" value="claude-sonnet-5">
+    </div>
+    <div class="field grow">
+      <label for="apikey">API Key</label>
+      <input type="password" id="apikey" placeholder="sk-ant-... or sk-...">
+    </div>
+    <div class="field">
+      <div class="checkbox-row">
+        <input type="checkbox" id="rememberKey">
+        <label for="rememberKey" style="text-transform:none; font-size:12.5px;">Remember on this device</label>
+      </div>
+      <div class="key-note">Stored only in this browser's localStorage, sent only to the provider you pick. Never touches any server of ours — there isn't one.</div>
+    </div>
+  </section>
+
+  <section class="workspace">
+    <div class="panel">
+      <div class="panel-head">
+        <span class="tag">01 · Resumes</span>
+        <span class="count" id="resumeSlotCount">0/3 added</span>
+      </div>
+      <div class="resume-body">
+        <div class="dropzone" id="dropzone">
+          <strong>Click to upload</strong> or drag a PDF here &mdash; up to 3 resumes, .pdf only
+        </div>
+        <input type="file" id="fileInput" accept="application/pdf" multiple hidden>
+        <div id="resumeSlots"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <span class="tag">02 · Job Description</span>
+        <span class="count" id="jdCount">0 chars</span>
+      </div>
+      <textarea id="jdInput" placeholder="Paste the job description here..."></textarea>
+    </div>
+  </section>
+
+  <div class="action-row">
+    <button class="run" id="runBtn" disabled>Analyze match</button>
+    <span class="status" id="statusText"></span>
+  </div>
+
+  <section class="results" id="results">
+    <div class="results-head" id="resultsHead"></div>
+    <div id="resultCards"></div>
+  </section>
+
+  <footer>
+    Redline — a static, client-side resume/JD matcher. PDFs are parsed in your browser (via pdf.js); nothing is uploaded anywhere except the text sent to your chosen model provider.
+  </footer>
+</div>
+
+<script>
+if (window.pdfjsLib){
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+const $ = id => document.getElementById(id);
+
+const provider = $('provider');
+const modelInput = $('model');
+const apikey = $('apikey');
+const rememberKey = $('rememberKey');
+const jdInput = $('jdInput');
+const dropzone = $('dropzone');
+const fileInput = $('fileInput');
+const resumeSlots = $('resumeSlots');
+const resumeSlotCount = $('resumeSlotCount');
+const runBtn = $('runBtn');
+const statusText = $('statusText');
+const results = $('results');
+
+const MAX_RESUMES = 3;
+let resumes = []; // { id, name, text, status: 'extracting'|'ready'|'error', error }
+
+const DEFAULT_MODELS = { anthropic: 'claude-sonnet-5', openai: 'gpt-4o' };
+provider.addEventListener('change', () => { modelInput.value = DEFAULT_MODELS[provider.value]; });
+
+try{
+  const savedProvider = localStorage.getItem('redline_provider');
+  const savedKey = localStorage.getItem('redline_key');
+  const savedModel = localStorage.getItem('redline_model');
+  if (savedProvider){ provider.value = savedProvider; }
+  if (savedModel){ modelInput.value = savedModel; }
+  if (savedKey){ apikey.value = savedKey; rememberKey.checked = true; }
+}catch(e){}
+
+function setStatus(msg, isErr){
+  statusText.textContent = msg || '';
+  statusText.classList.toggle('err', !!isErr);
+}
+function escapeHtml(str){
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function uid(){ return Math.random().toString(36).slice(2, 9); }
+
+function updateDropzoneState(){
+  const full = resumes.length >= MAX_RESUMES;
+  dropzone.classList.toggle('disabled', full);
+  dropzone.innerHTML = full
+    ? `<strong>${MAX_RESUMES} of ${MAX_RESUMES} added</strong> — remove one to add another`
+    : `<strong>Click to upload</strong> or drag a PDF here &mdash; up to ${MAX_RESUMES} resumes, .pdf only`;
+  resumeSlotCount.textContent = `${resumes.length}/${MAX_RESUMES} added`;
+  updateRunButton();
+}
+
+function updateRunButton(){
+  const anyReady = resumes.some(r => r.status === 'ready' && r.text.trim().length > 0);
+  runBtn.disabled = !(anyReady && jdInput.value.trim().length > 0);
+}
+
+jdInput.addEventListener('input', () => {
+  $('jdCount').textContent = jdInput.value.length + ' chars';
+  updateRunButton();
+});
+
+dropzone.addEventListener('click', () => {
+  if (resumes.length >= MAX_RESUMES) return;
+  fileInput.click();
+});
+['dragover','dragenter'].forEach(evt => {
+  dropzone.addEventListener(evt, e => { e.preventDefault(); if (resumes.length < MAX_RESUMES) dropzone.classList.add('drag'); });
+});
+['dragleave','drop'].forEach(evt => {
+  dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.remove('drag'); });
+});
+dropzone.addEventListener('drop', e => {
+  if (resumes.length >= MAX_RESUMES) return;
+  handleFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', () => {
+  handleFiles(fileInput.files);
+  fileInput.value = '';
+});
+
+function handleFiles(fileList){
+  const files = Array.from(fileList).filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+  const room = MAX_RESUMES - resumes.length;
+  files.slice(0, room).forEach(addResumeFile);
+}
+
+async function addResumeFile(file){
+  const id = uid();
+  const defaultName = file.name.replace(/\.pdf$/i, '');
+  const entry = { id, name: defaultName, text: '', status: 'extracting', error: null };
+  resumes.push(entry);
+  renderSlots();
+  updateDropzoneState();
+
+  try{
+    const text = await extractPdfText(file);
+    entry.text = text;
+    entry.status = text.trim().length > 0 ? 'ready' : 'error';
+    if (entry.status === 'error') entry.error = 'No extractable text found — this PDF may be scanned images.';
+  }catch(err){
+    entry.status = 'error';
+    entry.error = 'Could not read this PDF.';
+    console.error(err);
+  }
+  renderSlots();
+  updateDropzoneState();
+}
+
+async function extractPdfText(file){
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  let text = '';
+  for (let i = 1; i <= pdf.numPages; i++){
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items.map(it => it.str).join(' ');
+    text += pageText + '\n\n';
+  }
+  return text.trim();
+}
+
+function removeResume(id){
+  resumes = resumes.filter(r => r.id !== id);
+  renderSlots();
+  updateDropzoneState();
+}
+
+function renderSlots(){
+  resumeSlots.innerHTML = '';
+  resumes.forEach(r => {
+    const slot = document.createElement('div');
+    slot.className = 'resume-slot';
+
+    const top = document.createElement('div');
+    top.className = 'resume-slot-top';
+
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.value = r.name;
+    nameInput.addEventListener('input', () => { r.name = nameInput.value; });
+
+    const rm = document.createElement('button');
+    rm.className = 'rm';
+    rm.textContent = '×';
+    rm.title = 'Remove';
+    rm.addEventListener('click', () => removeResume(r.id));
+
+    top.appendChild(nameInput);
+    top.appendChild(rm);
+
+    const meta = document.createElement('div');
+    meta.className = 'resume-slot-meta';
+    if (r.status === 'extracting'){
+      meta.innerHTML = `<span class="spinner"></span> extracting text...`;
+    } else if (r.status === 'ready'){
+      meta.innerHTML = `<span class="ok">✓ ready</span> · ${r.text.length} chars`;
+    } else {
+      meta.innerHTML = `<span class="warn">✕ ${r.error || 'error'}</span>`;
+    }
+
+    slot.appendChild(top);
+    slot.appendChild(meta);
+    resumeSlots.appendChild(slot);
+  });
+}
+
+function buildPrompt(resumeList, jd){
+  const resumeBlocks = resumeList.map((r, i) =>
+    `RESUME ${i + 1} — name: "${r.name}"\n"""\n${r.text}\n"""`
+  ).join('\n\n');
+
+  return `You are helping a job seeker compare multiple candidate resumes against one job description.
+
+${resumeBlocks}
+
+JOB DESCRIPTION:
+"""
+${jd}
+"""
+
+For EACH resume, analyze how well it matches this job description independently, using the same scoring standard across all of them so the scores are comparable. Respond with ONLY valid JSON (no markdown fences, no commentary before or after), matching exactly this shape:
+
+{
+  "results": [
+    {
+      "name": "<the exact name given for this resume>",
+      "score": <integer 0-100>,
+      "summary": "<2-3 sentence plain-language read on the fit>",
+      "matched_skills": ["<short phrase, 2-5 words, present in both this resume and the JD>", ...],
+      "missing_skills": ["<short phrase, 2-5 words, required by the JD but not shown in this resume>", ...],
+      "suggestions": ["<specific, actionable rewrite or addition to close a gap, for this resume>", ...]
+    }
+  ]
+}
+
+Include one object per resume, in the same order given. Include 5-12 items in matched_skills and missing_skills where possible, and 3-6 suggestions per resume.`;
+}
+
+async function callAnthropic(key, model, prompt){
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: model,
+      max_tokens: 4000,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+  if (!resp.ok){
+    const t = await resp.text();
+    throw new Error(`Anthropic API error (${resp.status}): ${t.slice(0,300)}`);
+  }
+  const data = await resp.json();
+  const textBlock = (data.content || []).find(b => b.type === 'text');
+  if (!textBlock) throw new Error('No text in Anthropic response.');
+  return textBlock.text;
+}
+
+async function callOpenAI(key, model, prompt){
+  const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+    body: JSON.stringify({
+      model: model,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.3
+    })
+  });
+  if (!resp.ok){
+    const t = await resp.text();
+    throw new Error(`OpenAI API error (${resp.status}): ${t.slice(0,300)}`);
+  }
+  const data = await resp.json();
+  const content = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+  if (!content) throw new Error('No content in OpenAI response.');
+  return content;
+}
+
+function parseModelJson(raw){
+  let cleaned = raw.trim();
+  cleaned = cleaned.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '');
+  const start = cleaned.indexOf('{');
+  const end = cleaned.lastIndexOf('}');
+  if (start !== -1 && end !== -1) cleaned = cleaned.slice(start, end + 1);
+  return JSON.parse(cleaned);
+}
+
+function highlightResume(resumeText, matched){
+  let html = escapeHtml(resumeText);
+  const sorted = [...matched].sort((a,b) => b.length - a.length);
+  sorted.forEach(term => {
+    if (!term || term.length < 2) return;
+    const esc = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(`(${esc})`, 'gi');
+    html = html.replace(re, '<mark class="hit">$1</mark>');
+  });
+  return html;
+}
+
+function scoreColor(score){
+  if (score < 40) return 'var(--gap)';
+  if (score < 70) return 'var(--score)';
+  return 'var(--match)';
+}
+
+function buildMiniDial(score){
+  const c = 150;
+  const offset = c - (c * score / 100);
+  const color = scoreColor(score);
+  return `<div class="mini-dial-wrap">
+    <svg viewBox="0 0 56 56">
+      <circle cx="28" cy="28" r="24" fill="none" stroke="var(--surface-2)" stroke-width="6"/>
+      <circle cx="28" cy="28" r="24" fill="none" stroke="${color}" stroke-width="6" stroke-linecap="round"
+        stroke-dasharray="${c}" stroke-dashoffset="${offset}"/>
+    </svg>
+    <div class="mini-dial-num">${score}</div>
+  </div>`;
+}
+
+function renderResults(payload, resumeList){
+  const items = (payload.results || []).map(r => {
+    const src = resumeList.find(x => x.name === r.name) || resumeList[0];
+    return { ...r, _sourceText: src ? src.text : '' };
+  });
+  items.sort((a, b) => (b.score || 0) - (a.score || 0));
+
+  $('resultsHead').textContent = items.length > 1
+    ? `Ranked ${items.length} resumes against this job description`
+    : `Match result`;
+
+  const cardsEl = $('resultCards');
+  cardsEl.innerHTML = '';
+
+  items.forEach((item, idx) => {
+    const score = Math.max(0, Math.min(100, Math.round(item.score || 0)));
+    const card = document.createElement('div');
+    card.className = 'result-card';
+
+    const head = document.createElement('div');
+    head.className = 'result-card-head' + (idx === 0 && items.length > 1 ? ' rank-1' : '');
+    head.innerHTML = `
+      ${items.length > 1 ? `<span class="rank-badge">#${idx + 1}</span>` : ''}
+      <span class="result-name">${escapeHtml(item.name || 'Resume')}</span>
+      ${buildMiniDial(score)}
+    `;
+
+    const body = document.createElement('div');
+    body.className = 'result-card-body';
+
+    const summary = document.createElement('div');
+    summary.className = 'summary-text';
+    summary.textContent = item.summary || '';
+
+    const chipCols = document.createElement('div');
+    chipCols.className = 'chip-cols';
+    chipCols.innerHTML = `
+      <div class="chip-col match">
+        <h4>✓ What lines up</h4>
+        <div class="chips">${(item.matched_skills || []).map(s => `<span class="chip match">${escapeHtml(s)}</span>`).join('')}</div>
+      </div>
+      <div class="chip-col gap">
+        <h4>✕ What's missing</h4>
+        <div class="chips">${(item.missing_skills || []).map(s => `<span class="chip gap">${escapeHtml(s)}</span>`).join('')}</div>
+      </div>
+    `;
+
+    const suggestions = document.createElement('div');
+    suggestions.className = 'suggestions';
+    suggestions.innerHTML = `<h4>Redline notes</h4><ol>${(item.suggestions || []).map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ol>`;
+
+    const details = document.createElement('details');
+    details.className = 'markup';
+    const summaryTag = document.createElement('summary');
+    summaryTag.textContent = 'View marked-up resume text';
+    const rendered = document.createElement('div');
+    rendered.className = 'rendered';
+    rendered.innerHTML = highlightResume(item._sourceText, item.matched_skills || []);
+    details.appendChild(summaryTag);
+    details.appendChild(rendered);
+
+    body.appendChild(summary);
+    body.appendChild(chipCols);
+    body.appendChild(suggestions);
+    body.appendChild(details);
+
+    card.appendChild(head);
+    card.appendChild(body);
+    cardsEl.appendChild(card);
+  });
+
+  results.classList.add('show');
+  results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+runBtn.addEventListener('click', async () => {
+  const key = apikey.value.trim();
+  const model = modelInput.value.trim();
+  const jdText = jdInput.value.trim();
+  const prov = provider.value;
+  const readyResumes = resumes.filter(r => r.status === 'ready' && r.text.trim().length > 0);
+
+  if (!key){ setStatus('Add an API key first.', true); apikey.focus(); return; }
+  if (readyResumes.length === 0){ setStatus('Upload at least one resume PDF.', true); return; }
+  if (!jdText){ setStatus('Paste a job description.', true); return; }
+
+  if (rememberKey.checked){
+    try{
+      localStorage.setItem('redline_key', key);
+      localStorage.setItem('redline_provider', prov);
+      localStorage.setItem('redline_model', model);
+    }catch(e){}
+  } else {
+    try{
+      localStorage.removeItem('redline_key');
+      localStorage.removeItem('redline_provider');
+      localStorage.removeItem('redline_model');
+    }catch(e){}
+  }
+
+  runBtn.disabled = true;
+  setStatus(`Calling ${prov === 'anthropic' ? 'Anthropic' : 'OpenAI'} to compare ${readyResumes.length} resume${readyResumes.length > 1 ? 's' : ''}...`);
+
+  try{
+    const prompt = buildPrompt(readyResumes, jdText);
+    const raw = prov === 'anthropic'
+      ? await callAnthropic(key, model, prompt)
+      : await callOpenAI(key, model, prompt);
+    const data = parseModelJson(raw);
+    renderResults(data, readyResumes);
+    setStatus('Done.');
+  }catch(err){
+    console.error(err);
+    setStatus(err.message || 'Something went wrong.', true);
+  }finally{
+    updateRunButton();
+  }
+});
+
+updateDropzoneState();
+</script>
+</body>
+</html>
